@@ -3,10 +3,10 @@
 import axios from "axios";
 
 const SPREADS = {
-  NGNEUR: 20,
-  NGNUSD: 3,
-  NGNGBP: 4,
-  NGNCAD: 6,
+  NGNEUR: 0,
+  NGNUSD: 0,
+  NGNGBP: 0,
+  NGNCAD: 0,
 };
 
 export async function fetchNGNRates() {

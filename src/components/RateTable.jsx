@@ -55,21 +55,27 @@ function currencySymbol(base) {
 function CorridorTable({ title, initialData, fetchRates }) {
   const [rows, setRows] = useState(initialData);
   const [editingIndex, setEditingIndex] = useState(null);
-  const [spreadInput, setSpreadInput] = useState("");
+  const [spreadBuyInput, setSpreadBuyInput] = useState("");
+  const [spreadSellInput, setSpreadSellInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleEdit = (index) => {
     setEditingIndex(index);
-    setSpreadInput(rows[index].spread);
+    setSpreadBuyInput(rows[index].spreadBuy ?? rows[index].spread ?? 0);
+    setSpreadSellInput(rows[index].spreadSell ?? rows[index].spread ?? 0);
   };
 
   const handleSave = (index) => {
     const updated = [...rows];
-    const spread = parseFloat(spreadInput);
+    const buySpread = parseFloat(spreadBuyInput);
+    const sellSpread = parseFloat(spreadSellInput);
     const rate = updated[index].liveRate;
-    updated[index].spread = spread;
-    updated[index].buy = +(rate - spread).toFixed(2);
-    updated[index].sell = +(rate + spread).toFixed(2);
+
+    updated[index].spreadBuy = buySpread;
+    updated[index].spreadSell = sellSpread;
+    updated[index].buy = +(rate - buySpread).toFixed(2);
+    updated[index].sell = +(rate + sellSpread).toFixed(2);
+
     setRows(updated);
     setEditingIndex(null);
   };
@@ -79,10 +85,19 @@ function CorridorTable({ title, initialData, fetchRates }) {
     try {
       setLoading(true);
       const updated = await fetchRates();
-      setRows(updated);
+
+      const normalized = updated.map((item) => ({
+        ...item,
+        spreadBuy: item.spreadBuy ?? item.spread ?? 5,
+        spreadSell: item.spreadSell ?? item.spread ?? 5,
+        buy: +(item.liveRate - (item.spreadBuy ?? item.spread ?? 5)).toFixed(2),
+        sell: +(item.liveRate + (item.spreadSell ?? item.spread ?? 5)).toFixed(2),
+      }));
+
+      setRows(normalized);
     } catch (err) {
-      alert("Could not fetch rates.");
       console.error("Error fetching rates for:", title, err);
+      alert("Could not fetch rates.");
     } finally {
       setLoading(false);
     }
@@ -107,7 +122,8 @@ function CorridorTable({ title, initialData, fetchRates }) {
           <tr>
             <th className="py-3">Pair</th>
             <th className="py-3">Live Rate</th>
-            <th className="py-3">Spread</th>
+            <th className="py-3">Spread (Buy)</th>
+            <th className="py-3">Spread (Sell)</th>
             <th className="py-3">Buy Rate</th>
             <th className="py-3">Sell Rate</th>
             <th className="py-3"></th>
@@ -122,18 +138,32 @@ function CorridorTable({ title, initialData, fetchRates }) {
                 {editingIndex === i ? (
                   <input
                     type="number"
-                    value={spreadInput}
-                    onChange={(e) => setSpreadInput(e.target.value)}
+                    value={spreadBuyInput}
+                    onChange={(e) => setSpreadBuyInput(e.target.value)}
                     className="bg-[#1a1a1a] border border-gray-600 px-2 py-1 rounded text-white w-16 text-sm"
                   />
                 ) : (
-                  <span className="bg-orange-700 text-white text-xs py-1 px-2 rounded-md">
-                    {currencySymbol(title)}{item.spread}
+                  <span className="bg-blue-700 text-white text-xs py-1 px-2 rounded-md">
+                    {currencySymbol(title)}{item.spreadBuy ?? item.spread}
                   </span>
                 )}
               </td>
-              <td>{item.buy.toLocaleString()}</td>
-              <td>{item.sell.toLocaleString()}</td>
+              <td>
+                {editingIndex === i ? (
+                  <input
+                    type="number"
+                    value={spreadSellInput}
+                    onChange={(e) => setSpreadSellInput(e.target.value)}
+                    className="bg-[#1a1a1a] border border-gray-600 px-2 py-1 rounded text-white w-16 text-sm"
+                  />
+                ) : (
+                  <span className="bg-red-700 text-white text-xs py-1 px-2 rounded-md">
+                    {currencySymbol(title)}{item.spreadSell ?? item.spread}
+                  </span>
+                )}
+              </td>
+              <td>{item.buy?.toLocaleString()}</td>
+              <td>{item.sell?.toLocaleString()}</td>
               <td>
                 {editingIndex === i ? (
                   <button
@@ -165,7 +195,6 @@ export default function RateTable() {
     <div className="space-y-8">
       {Object.entries(initialCorridorData).map(([corridor, data]) => {
         let fetcher = null;
-
         switch (corridor) {
           case "USD":
             fetcher = fetchUSDRates;
@@ -183,7 +212,6 @@ export default function RateTable() {
             fetcher = fetchNGNRates;
             break;
         }
-
         return (
           <CorridorTable
             key={corridor}
